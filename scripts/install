@@ -150,6 +150,20 @@ ynh_script_progression "Reconfigure GitLab..."
 
 ynh_hide_warnings gitlab-ctl reconfigure
 
+# Fix systemd unit: remove Slice= and Delegate= directives
+# (incompatible with cgroup v2 on Ubuntu 24.04, causes exit 203)
+sed -i '/^Slice=/d' /usr/lib/systemd/system/gitlab-runsvdir.service
+sed -i '/^Delegate=/d' /usr/lib/systemd/system/gitlab-runsvdir.service
+systemctl daemon-reload
+
+# Ensure gitlab-runsvdir is healthy after reconfigure
+if ! systemctl is-active gitlab-runsvdir >/dev/null 2>&1; then
+    ynh_print_warn "gitlab-runsvdir failed after reconfigure, resetting and restarting..."
+    systemctl reset-failed gitlab-runsvdir
+    systemctl restart gitlab-runsvdir
+    sleep 5
+fi
+
 # Allow ssh for git
 usermod -a -G "ssh.app" "git"
 
